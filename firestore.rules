@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isRahul() {
+      return signedIn()
+        && request.auth.token.email == 'mentor1@mentorconnect.com';
+    }
+
+    function isRequestOwner() {
+      return signedIn()
+        && resource.data.studentEmail == request.auth.token.email;
+    }
+
+    match /mentorshipRequests/{requestId} {
+      allow get, list: if
+        isRequestOwner()
+        || (isRahul() && resource.data.mentorId == 1);
+
+      allow create: if signedIn()
+        && request.resource.data.studentEmail == request.auth.token.email
+        && request.resource.data.mentorId is int
+        && request.resource.data.mentorId >= 1
+        && request.resource.data.mentorId <= 4
+        && request.resource.data.status == 'Pending';
+
+      allow update: if isRahul()
+        && resource.data.mentorId == 1
+        && resource.data.status == 'Pending'
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['Accepted', 'Rejected'];
+
+      allow delete: if isRequestOwner();
+    }
+  }
+}
